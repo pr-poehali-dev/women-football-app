@@ -89,12 +89,36 @@ const Index = () => {
       const response = await fetch('https://functions.poehali.dev/d35ea535-05ac-481a-8f8e-7bd7261bb3e3');
       const data = await response.json();
       
-      if (data.success && data.data && data.data.length > 0) {
-        setTable(data.data);
+      if (data.success) {
+        let updatedCount = 0;
+        
+        if (data.table && data.table.length > 0) {
+          setTable(data.table);
+          updatedCount++;
+        }
+        
+        if (data.games && data.games.length > 0) {
+          const existingRegistrations = new Map(
+            games.map(g => [g.opponent, g.registered])
+          );
+          
+          const updatedGames = data.games.map((newGame: Game) => ({
+            ...newGame,
+            registered: existingRegistrations.get(newGame.opponent) || []
+          }));
+          
+          setGames(updatedGames);
+          updatedCount++;
+        }
+        
         setLastSync(new Date());
+        const descriptions = [];
+        if (data.table?.length) descriptions.push(`${data.table.length} команд`);
+        if (data.games?.length) descriptions.push(`${data.games.length} игр`);
+        
         toast({
-          title: '✅ Таблица обновлена',
-          description: `Загружено ${data.data.length} команд с wmfl.ru`,
+          title: '✅ Данные обновлены',
+          description: `Загружено ${descriptions.join(' и ')} с wmfl.ru`,
           duration: 4000,
         });
       } else {

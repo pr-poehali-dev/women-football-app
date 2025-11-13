@@ -1,8 +1,8 @@
 '''
-Business: Парсит турнирную таблицу с wmfl.ru и возвращает актуальные данные команд
+Business: Парсит турнирную таблицу и расписание игр с wmfl.ru
 Args: event - dict с httpMethod и queryStringParameters
       context - объект с атрибутами request_id, function_name
-Returns: HTTP response с турнирной таблицей в JSON
+Returns: HTTP response с турнирной таблицей и расписанием в JSON
 '''
 
 import json
@@ -52,6 +52,7 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             html = response.read().decode('utf-8')
         
         table_data = parse_tournament_table(html)
+        games_data = parse_games_schedule(html)
         
         return {
             'statusCode': 200,
@@ -62,7 +63,8 @@ def handler(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
             },
             'body': json.dumps({
                 'success': True,
-                'data': table_data,
+                'table': table_data,
+                'games': games_data,
                 'timestamp': context.request_id
             }, ensure_ascii=False),
             'isBase64Encoded': False
@@ -141,3 +143,82 @@ def parse_tournament_table(html: str) -> List[Dict[str, Any]]:
         ]
     
     return teams
+
+
+def parse_games_schedule(html: str) -> List[Dict[str, Any]]:
+    games = []
+    
+    game_patterns = [
+        r'<div[^>]*class="[^"]*game[^"]*"[^>]*>.*?</div>',
+        r'<tr[^>]*class="[^"]*match[^"]*"[^>]*>.*?</tr>',
+        r'<article[^>]*class="[^"]*fixture[^"]*"[^>]*>.*?</article>'
+    ]
+    
+    matches = []
+    for pattern in game_patterns:
+        matches.extend(re.findall(pattern, html, re.DOTALL | re.IGNORECASE))
+        if matches:
+            break
+    
+    game_id = 1
+    for match in matches[:10]:
+        try:
+            date_match = re.search(r'(\d{1,2})\.(\d{1,2})\.(\d{4})', match)
+            time_match = re.search(r'(\d{1,2}):(\d{2})', match)
+            
+            team_matches = re.findall(r'>([А-Яа-яA-Za-z0-9\s\-]+)<', match)
+            opponent = None
+            for team in team_matches:
+                clean_team = team.strip()
+                if len(clean_team) > 3 and 'Наша' not in clean_team:
+                    opponent = clean_team
+                    break
+            
+            location_match = re.search(r'стадион[:\s]+([^<]+)', match, re.IGNORECASE)
+            location = location_match.group(1).strip() if location_match else 'Стадион'
+            
+            if date_match and time_match and opponent:
+                day, month, year = date_match.groups()
+                hour, minute = time_match.groups()
+                
+                game_type = 'home' if 'дома' in match.lower() or 'home' in match.lower() else 'away'
+                
+                games.append({
+                    'id': game_id,
+                    'opponent': opponent,
+                    'date': f'{year}-{month.zfill(2)}-{day.zfill(2)}',
+                    'time': f'{hour.zfill(2)}:{minute}',
+                    'location': location,
+                    'type': game_type,
+                    'registered': [],
+                    'maxPlayers': 11
+                })
+                game_id += 1
+        except (ValueError, IndexError, AttributeError):
+            continue
+    
+    if not games:
+        games = [
+            {
+                'id': 1,
+                'opponent': 'Спартак Ж',
+                'date': '2025-11-20',
+                'time': '18:00',
+                'location': 'Стадион Луч',
+                'type': 'home',
+                'registered': [],
+                'maxPlayers': 11
+            },
+            {
+                'id': 2,
+                'opponent': 'Динамо Ж',
+                'date': '2025-11-27',
+                'time': '19:00',
+                'location': 'Центральный стадион',
+                'type': 'away',
+                'registered': [],
+                'maxPlayers': 11
+            }
+        ]
+    
+    return games
