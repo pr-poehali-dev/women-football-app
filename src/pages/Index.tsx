@@ -64,11 +64,20 @@ const mockMessages: Message[] = [
 
 const Index = () => {
   const [games, setGames] = useState<Game[]>(mockGames);
+  const [table, setTable] = useState<TeamStats[]>(mockTable);
   const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [newMessage, setNewMessage] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
   const [editingGame, setEditingGame] = useState<Game | null>(null);
   const [gameForm, setGameForm] = useState<Partial<Game>>({});
+  const [editingTeam, setEditingTeam] = useState<TeamStats | null>(null);
+  const [teamForm, setTeamForm] = useState<Partial<TeamStats>>({});
+  const [stats, setStats] = useState({
+    goals: 18,
+    assists: 12,
+    matches: 15,
+    winRate: Math.round((11 / 15) * 100)
+  });
   const userName = 'Вы';
   const { toast } = useToast();
 
@@ -193,12 +202,35 @@ const Index = () => {
     });
   };
 
-  const playerStats = {
-    goals: 18,
-    assists: 12,
-    matches: 15,
-    winRate: Math.round((11 / 15) * 100)
+  const openEditTeam = (team: TeamStats) => {
+    setEditingTeam(team);
+    setTeamForm(team);
   };
+
+  const saveTeam = () => {
+    if (editingTeam && teamForm.name) {
+      const updatedTeam = { ...editingTeam, ...teamForm } as TeamStats;
+      updatedTeam.points = (updatedTeam.won * 3) + updatedTeam.draw;
+      setTable(table.map(t => t.name === editingTeam.name ? updatedTeam : t).sort((a, b) => b.points - a.points));
+      toast({
+        title: '✅ Команда обновлена',
+        description: 'Изменения сохранены',
+        duration: 3000,
+      });
+      setEditingTeam(null);
+      setTeamForm({});
+    }
+  };
+
+  const updateStats = () => {
+    toast({
+      title: '✅ Статистика обновлена',
+      description: 'Изменения сохранены',
+      duration: 3000,
+    });
+  };
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-mint/10 via-blue/10 to-cyan/10">
@@ -529,7 +561,7 @@ const Index = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {mockTable.map((team, index) => (
+                      {table.map((team, index) => (
                         <tr 
                           key={team.name} 
                           className={`border-b hover:bg-muted/50 transition-colors ${index === 0 ? 'bg-mint/10 font-semibold' : ''}`}
@@ -544,6 +576,77 @@ const Index = () => {
                           <td className="text-center p-3">{team.draw}</td>
                           <td className="text-center p-3">{team.lost}</td>
                           <td className="text-center p-3 font-bold">{team.points}</td>
+                          {isAdmin && (
+                            <td className="p-3">
+                              <Dialog>
+                                <DialogTrigger asChild>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => openEditTeam(team)}
+                                  >
+                                    <Icon name="Edit" size={16} />
+                                  </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-md">
+                                  <DialogHeader>
+                                    <DialogTitle>Редактировать команду</DialogTitle>
+                                    <DialogDescription>Измените статистику команды</DialogDescription>
+                                  </DialogHeader>
+                                  <div className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                      <Label>Название команды</Label>
+                                      <Input
+                                        value={teamForm.name || ''}
+                                        onChange={(e) => setTeamForm({ ...teamForm, name: e.target.value })}
+                                      />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div className="space-y-2">
+                                        <Label>Игры</Label>
+                                        <Input
+                                          type="number"
+                                          value={teamForm.played || 0}
+                                          onChange={(e) => setTeamForm({ ...teamForm, played: parseInt(e.target.value) })}
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label>Победы</Label>
+                                        <Input
+                                          type="number"
+                                          value={teamForm.won || 0}
+                                          onChange={(e) => setTeamForm({ ...teamForm, won: parseInt(e.target.value) })}
+                                        />
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div className="space-y-2">
+                                        <Label>Ничьи</Label>
+                                        <Input
+                                          type="number"
+                                          value={teamForm.draw || 0}
+                                          onChange={(e) => setTeamForm({ ...teamForm, draw: parseInt(e.target.value) })}
+                                        />
+                                      </div>
+                                      <div className="space-y-2">
+                                        <Label>Поражения</Label>
+                                        <Input
+                                          type="number"
+                                          value={teamForm.lost || 0}
+                                          onChange={(e) => setTeamForm({ ...teamForm, lost: parseInt(e.target.value) })}
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <DialogFooter>
+                                    <Button onClick={saveTeam} className="bg-gradient-to-r from-mint to-cyan">
+                                      Сохранить
+                                    </Button>
+                                  </DialogFooter>
+                                </DialogContent>
+                              </Dialog>
+                            </td>
+                          )}
                         </tr>
                       ))}
                     </tbody>
@@ -554,6 +657,65 @@ const Index = () => {
           </TabsContent>
 
           <TabsContent value="stats" className="space-y-4">
+            {isAdmin && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button className="w-full mb-4 bg-gradient-to-r from-mint to-cyan hover:opacity-90">
+                    <Icon name="Edit" size={18} className="mr-2" />
+                    Редактировать статистику
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Редактировать статистику</DialogTitle>
+                    <DialogDescription>Измените показатели команды</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Голы</Label>
+                        <Input
+                          type="number"
+                          value={stats.goals}
+                          onChange={(e) => setStats({ ...stats, goals: parseInt(e.target.value) })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Передачи</Label>
+                        <Input
+                          type="number"
+                          value={stats.assists}
+                          onChange={(e) => setStats({ ...stats, assists: parseInt(e.target.value) })}
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Матчи</Label>
+                        <Input
+                          type="number"
+                          value={stats.matches}
+                          onChange={(e) => setStats({ ...stats, matches: parseInt(e.target.value) })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>% побед</Label>
+                        <Input
+                          type="number"
+                          value={stats.winRate}
+                          onChange={(e) => setStats({ ...stats, winRate: parseInt(e.target.value) })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={updateStats} className="bg-gradient-to-r from-mint to-cyan">
+                      Сохранить
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Card className="bg-gradient-to-br from-mint/20 to-mint/5 border-mint/20">
                 <CardHeader className="pb-3">
@@ -562,7 +724,7 @@ const Index = () => {
                 <CardContent>
                   <div className="flex items-center gap-3">
                     <Icon name="Target" size={32} className="text-mint" />
-                    <span className="text-4xl font-bold">{playerStats.goals}</span>
+                    <span className="text-4xl font-bold">{stats.goals}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -574,7 +736,7 @@ const Index = () => {
                 <CardContent>
                   <div className="flex items-center gap-3">
                     <Icon name="Zap" size={32} className="text-blue" />
-                    <span className="text-4xl font-bold">{playerStats.assists}</span>
+                    <span className="text-4xl font-bold">{stats.assists}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -586,7 +748,7 @@ const Index = () => {
                 <CardContent>
                   <div className="flex items-center gap-3">
                     <Icon name="Users" size={32} className="text-cyan" />
-                    <span className="text-4xl font-bold">{playerStats.matches}</span>
+                    <span className="text-4xl font-bold">{stats.matches}</span>
                   </div>
                 </CardContent>
               </Card>
@@ -598,7 +760,7 @@ const Index = () => {
                 <CardContent>
                   <div className="flex items-center gap-3">
                     <Icon name="TrendingUp" size={32} className="text-yellow" />
-                    <span className="text-4xl font-bold">{playerStats.winRate}%</span>
+                    <span className="text-4xl font-bold">{stats.winRate}%</span>
                   </div>
                 </CardContent>
               </Card>
