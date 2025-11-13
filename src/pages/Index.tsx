@@ -9,6 +9,9 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Icon from '@/components/ui/icon';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Game {
   id: number;
@@ -63,6 +66,9 @@ const Index = () => {
   const [games, setGames] = useState<Game[]>(mockGames);
   const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [newMessage, setNewMessage] = useState('');
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [editingGame, setEditingGame] = useState<Game | null>(null);
+  const [gameForm, setGameForm] = useState<Partial<Game>>({});
   const userName = 'Вы';
   const { toast } = useToast();
 
@@ -138,6 +144,55 @@ const Index = () => {
     }
   };
 
+  const openEditGame = (game: Game) => {
+    setEditingGame(game);
+    setGameForm(game);
+  };
+
+  const saveGame = () => {
+    if (editingGame && gameForm.opponent && gameForm.date && gameForm.time && gameForm.location) {
+      setGames(games.map(g => g.id === editingGame.id ? { ...editingGame, ...gameForm } as Game : g));
+      toast({
+        title: '✅ Игра обновлена',
+        description: `Изменения сохранены`,
+        duration: 3000,
+      });
+      setEditingGame(null);
+      setGameForm({});
+    }
+  };
+
+  const addNewGame = () => {
+    if (gameForm.opponent && gameForm.date && gameForm.time && gameForm.location) {
+      const newGame: Game = {
+        id: Math.max(...games.map(g => g.id)) + 1,
+        opponent: gameForm.opponent,
+        date: gameForm.date,
+        time: gameForm.time,
+        location: gameForm.location,
+        type: (gameForm.type as 'home' | 'away') || 'home',
+        registered: [],
+        maxPlayers: gameForm.maxPlayers || 11
+      };
+      setGames([...games, newGame]);
+      toast({
+        title: '✅ Игра добавлена',
+        description: `${newGame.opponent} — ${new Date(newGame.date).toLocaleDateString('ru-RU')}`,
+        duration: 3000,
+      });
+      setGameForm({});
+    }
+  };
+
+  const deleteGame = (gameId: number) => {
+    setGames(games.filter(g => g.id !== gameId));
+    toast({
+      title: 'Игра удалена',
+      variant: 'destructive',
+      duration: 3000,
+    });
+  };
+
   const playerStats = {
     goals: 18,
     assists: 12,
@@ -149,11 +204,25 @@ const Index = () => {
     <div className="min-h-screen bg-gradient-to-br from-mint/10 via-blue/10 to-cyan/10">
       <div className="container mx-auto px-4 py-6 max-w-7xl">
         <header className="text-center mb-8 animate-fade-in">
-          <div className="flex items-center justify-center gap-3 mb-2">
-            <Icon name="Trophy" size={40} className="text-yellow" />
-            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-mint via-blue to-cyan bg-clip-text text-transparent">
-              Женская Футбольная Команда
-            </h1>
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex-1" />
+            <div className="flex items-center gap-3">
+              <Icon name="Trophy" size={40} className="text-yellow" />
+              <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-mint via-blue to-cyan bg-clip-text text-transparent">
+                Женская Футбольная Команда
+              </h1>
+            </div>
+            <div className="flex-1 flex justify-end">
+              <Button
+                onClick={() => setIsAdmin(!isAdmin)}
+                variant={isAdmin ? 'default' : 'outline'}
+                size="sm"
+                className={isAdmin ? 'bg-gradient-to-r from-mint to-cyan' : ''}
+              >
+                <Icon name={isAdmin ? 'Lock' : 'Settings'} size={18} className="mr-2" />
+                {isAdmin ? 'Режим админа' : 'Админ'}
+              </Button>
+            </div>
           </div>
           <p className="text-muted-foreground text-lg">Вместе к победе! ⚽</p>
         </header>
@@ -179,6 +248,88 @@ const Index = () => {
           </TabsList>
 
           <TabsContent value="schedule" className="space-y-4">
+            {isAdmin && (
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button className="w-full mb-4 bg-gradient-to-r from-mint to-cyan hover:opacity-90">
+                    <Icon name="Plus" size={18} className="mr-2" />
+                    Добавить новую игру
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Новая игра</DialogTitle>
+                    <DialogDescription>Добавьте информацию о матче</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label>Команда соперника</Label>
+                      <Input
+                        placeholder="Название команды"
+                        value={gameForm.opponent || ''}
+                        onChange={(e) => setGameForm({ ...gameForm, opponent: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Дата</Label>
+                        <Input
+                          type="date"
+                          value={gameForm.date || ''}
+                          onChange={(e) => setGameForm({ ...gameForm, date: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Время</Label>
+                        <Input
+                          type="time"
+                          value={gameForm.time || ''}
+                          onChange={(e) => setGameForm({ ...gameForm, time: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Место проведения</Label>
+                      <Input
+                        placeholder="Стадион"
+                        value={gameForm.location || ''}
+                        onChange={(e) => setGameForm({ ...gameForm, location: e.target.value })}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Тип</Label>
+                        <Select
+                          value={gameForm.type || 'home'}
+                          onValueChange={(value) => setGameForm({ ...gameForm, type: value as 'home' | 'away' })}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="home">Дома</SelectItem>
+                            <SelectItem value="away">В гостях</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Макс. игроков</Label>
+                        <Input
+                          type="number"
+                          value={gameForm.maxPlayers || 11}
+                          onChange={(e) => setGameForm({ ...gameForm, maxPlayers: parseInt(e.target.value) })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button onClick={addNewGame} className="bg-gradient-to-r from-mint to-cyan">
+                      Добавить игру
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            )}
             {games.map((game, index) => {
               const isRegistered = game.registered.includes(userName);
               const spotsLeft = game.maxPlayers - game.registered.length;
@@ -230,24 +381,121 @@ const Index = () => {
                       </div>
 
                       <div className="flex gap-2">
-                        {isRegistered ? (
-                          <Button 
-                            onClick={() => unregisterFromGame(game.id)}
-                            variant="outline"
-                            className="flex-1"
-                          >
-                            <Icon name="UserMinus" size={18} className="mr-2" />
-                            Отменить запись
-                          </Button>
-                        ) : (
-                          <Button 
-                            onClick={() => registerForGame(game.id)}
-                            disabled={spotsLeft === 0}
-                            className="flex-1 bg-gradient-to-r from-mint to-cyan hover:opacity-90"
-                          >
-                            <Icon name="UserPlus" size={18} className="mr-2" />
-                            Записаться
-                          </Button>
+                        {!isAdmin && (
+                          <>
+                            {isRegistered ? (
+                              <Button 
+                                onClick={() => unregisterFromGame(game.id)}
+                                variant="outline"
+                                className="flex-1"
+                              >
+                                <Icon name="UserMinus" size={18} className="mr-2" />
+                                Отменить запись
+                              </Button>
+                            ) : (
+                              <Button 
+                                onClick={() => registerForGame(game.id)}
+                                disabled={spotsLeft === 0}
+                                className="flex-1 bg-gradient-to-r from-mint to-cyan hover:opacity-90"
+                              >
+                                <Icon name="UserPlus" size={18} className="mr-2" />
+                                Записаться
+                              </Button>
+                            )}
+                          </>
+                        )}
+                        {isAdmin && (
+                          <>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button 
+                                  variant="outline"
+                                  className="flex-1"
+                                  onClick={() => openEditGame(game)}
+                                >
+                                  <Icon name="Edit" size={18} className="mr-2" />
+                                  Редактировать
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-md">
+                                <DialogHeader>
+                                  <DialogTitle>Редактировать игру</DialogTitle>
+                                  <DialogDescription>Измените информацию о матче</DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                  <div className="space-y-2">
+                                    <Label>Команда соперника</Label>
+                                    <Input
+                                      value={gameForm.opponent || ''}
+                                      onChange={(e) => setGameForm({ ...gameForm, opponent: e.target.value })}
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <Label>Дата</Label>
+                                      <Input
+                                        type="date"
+                                        value={gameForm.date || ''}
+                                        onChange={(e) => setGameForm({ ...gameForm, date: e.target.value })}
+                                      />
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Время</Label>
+                                      <Input
+                                        type="time"
+                                        value={gameForm.time || ''}
+                                        onChange={(e) => setGameForm({ ...gameForm, time: e.target.value })}
+                                      />
+                                    </div>
+                                  </div>
+                                  <div className="space-y-2">
+                                    <Label>Место проведения</Label>
+                                    <Input
+                                      value={gameForm.location || ''}
+                                      onChange={(e) => setGameForm({ ...gameForm, location: e.target.value })}
+                                    />
+                                  </div>
+                                  <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                      <Label>Тип</Label>
+                                      <Select
+                                        value={gameForm.type || 'home'}
+                                        onValueChange={(value) => setGameForm({ ...gameForm, type: value as 'home' | 'away' })}
+                                      >
+                                        <SelectTrigger>
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="home">Дома</SelectItem>
+                                          <SelectItem value="away">В гостях</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                    <div className="space-y-2">
+                                      <Label>Макс. игроков</Label>
+                                      <Input
+                                        type="number"
+                                        value={gameForm.maxPlayers || 11}
+                                        onChange={(e) => setGameForm({ ...gameForm, maxPlayers: parseInt(e.target.value) })}
+                                      />
+                                    </div>
+                                  </div>
+                                </div>
+                                <DialogFooter>
+                                  <Button onClick={saveGame} className="bg-gradient-to-r from-mint to-cyan">
+                                    Сохранить
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
+                            <Button 
+                              variant="destructive"
+                              onClick={() => deleteGame(game.id)}
+                            >
+                              <Icon name="Trash2" size={18} className="mr-2" />
+                              Удалить
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
