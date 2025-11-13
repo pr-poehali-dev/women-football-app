@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import Icon from '@/components/ui/icon';
 import { Progress } from '@/components/ui/progress';
+import { useToast } from '@/hooks/use-toast';
 
 interface Game {
   id: number;
@@ -63,8 +64,44 @@ const Index = () => {
   const [messages, setMessages] = useState<Message[]>(mockMessages);
   const [newMessage, setNewMessage] = useState('');
   const userName = 'Вы';
+  const { toast } = useToast();
+
+  useEffect(() => {
+    const checkUpcomingGames = () => {
+      const now = new Date();
+      const tomorrow = new Date(now);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      
+      games.forEach(game => {
+        const gameDate = new Date(game.date);
+        const timeDiff = gameDate.getTime() - now.getTime();
+        const hoursUntilGame = timeDiff / (1000 * 60 * 60);
+        
+        if (game.registered.includes(userName) && hoursUntilGame > 0 && hoursUntilGame <= 24) {
+          toast({
+            title: '⚽ Напоминание о матче',
+            description: `Завтра игра против ${game.opponent} в ${game.time}. ${game.location}`,
+            duration: 6000,
+          });
+        }
+      });
+    };
+
+    checkUpcomingGames();
+    const interval = setInterval(checkUpcomingGames, 3600000);
+    
+    return () => clearInterval(interval);
+  }, [games, userName, toast]);
 
   const registerForGame = (gameId: number) => {
+    const game = games.find(g => g.id === gameId);
+    if (game) {
+      toast({
+        title: '✅ Вы записаны на игру',
+        description: `${game.opponent} — ${new Date(game.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })} в ${game.time}`,
+        duration: 4000,
+      });
+    }
     setGames(games.map(game => 
       game.id === gameId && !game.registered.includes(userName)
         ? { ...game, registered: [...game.registered, userName] }
@@ -73,6 +110,15 @@ const Index = () => {
   };
 
   const unregisterFromGame = (gameId: number) => {
+    const game = games.find(g => g.id === gameId);
+    if (game) {
+      toast({
+        title: 'Запись отменена',
+        description: `Вы больше не записаны на игру ${game.opponent}`,
+        variant: 'destructive',
+        duration: 3000,
+      });
+    }
     setGames(games.map(game => 
       game.id === gameId
         ? { ...game, registered: game.registered.filter(name => name !== userName) }
