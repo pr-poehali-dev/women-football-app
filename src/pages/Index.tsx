@@ -78,8 +78,39 @@ const Index = () => {
     matches: 15,
     winRate: Math.round((11 / 15) * 100)
   });
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [lastSync, setLastSync] = useState<Date | null>(null);
   const userName = 'Вы';
   const { toast } = useToast();
+
+  const syncTournamentTable = async () => {
+    setIsSyncing(true);
+    try {
+      const response = await fetch('https://functions.poehali.dev/d35ea535-05ac-481a-8f8e-7bd7261bb3e3');
+      const data = await response.json();
+      
+      if (data.success && data.data && data.data.length > 0) {
+        setTable(data.data);
+        setLastSync(new Date());
+        toast({
+          title: '✅ Таблица обновлена',
+          description: `Загружено ${data.data.length} команд с wmfl.ru`,
+          duration: 4000,
+        });
+      } else {
+        throw new Error('Нет данных');
+      }
+    } catch (error) {
+      toast({
+        title: 'Ошибка синхронизации',
+        description: 'Не удалось загрузить данные турнира',
+        variant: 'destructive',
+        duration: 3000,
+      });
+    } finally {
+      setIsSyncing(false);
+    }
+  };
 
   useEffect(() => {
     const checkUpcomingGames = () => {
@@ -107,6 +138,12 @@ const Index = () => {
     
     return () => clearInterval(interval);
   }, [games, userName, toast]);
+
+  useEffect(() => {
+    syncTournamentTable();
+    const syncInterval = setInterval(syncTournamentTable, 300000);
+    return () => clearInterval(syncInterval);
+  }, []);
 
   const registerForGame = (gameId: number) => {
     const game = games.find(g => g.id === gameId);
@@ -540,11 +577,31 @@ const Index = () => {
           <TabsContent value="table">
             <Card>
               <CardHeader>
-                <CardTitle className="text-2xl flex items-center gap-2">
-                  <Icon name="Trophy" size={24} className="text-yellow" />
-                  Турнирная таблица
-                </CardTitle>
-                <CardDescription>Сезон 2025/2026</CardDescription>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="text-2xl flex items-center gap-2">
+                      <Icon name="Trophy" size={24} className="text-yellow" />
+                      Турнирная таблица
+                    </CardTitle>
+                    <CardDescription className="mt-2">
+                      Сезон 2025/2026
+                      {lastSync && (
+                        <span className="ml-2 text-xs">
+                          • Обновлено {lastSync.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      )}
+                    </CardDescription>
+                  </div>
+                  <Button
+                    onClick={syncTournamentTable}
+                    disabled={isSyncing}
+                    variant="outline"
+                    size="sm"
+                  >
+                    <Icon name={isSyncing ? "Loader2" : "RefreshCw"} size={16} className={`mr-2 ${isSyncing ? 'animate-spin' : ''}`} />
+                    {isSyncing ? 'Синхронизация...' : 'Обновить'}
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
